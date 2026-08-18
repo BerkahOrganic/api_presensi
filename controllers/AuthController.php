@@ -38,8 +38,8 @@ class AuthController
 
         // Cari user berdasarkan username
         $stmt = $pdo->prepare(
-            'SELECT NIK, ID_unit, ID_jabatan, Username, Password
-             FROM login
+            'SELECT login.id_user, login.password, login.username, login.activity, karyawan.nik, login.hak_akses, login.mac, karyawan.nama, karyawan.status_aktif, karyawan.id_unit, karyawan.id_jabatan
+             FROM login JOIN karyawan ON login.nik = karyawan.nik
              WHERE Username = ?'
         );
         $stmt->execute([$username]);
@@ -54,6 +54,7 @@ class AuthController
         $payload = [
             'nik'        => $user['NIK'],
             'username'   => $user['Username'],
+            'nama'       => $user['Nama'],
             'id_unit'    => $user['ID_unit'],
             'id_jabatan' => $user['ID_jabatan'],
         ];
@@ -66,6 +67,8 @@ class AuthController
             'user'  => [
                 'nik'        => $user['NIK'],
                 'username'   => $user['Username'],
+                'nama'       => $user['Nama'],
+                'status_aktif' => $user['Status_aktif'],
                 'id_unit'    => $user['ID_unit'],
                 'id_jabatan' => $user['ID_jabatan'],
             ],
@@ -83,8 +86,8 @@ class AuthController
 
         // Ambil data terbaru dari database berdasarkan NIK di token
         $stmt = $pdo->prepare(
-            'SELECT NIK, ID_unit, ID_jabatan, Username
-             FROM login
+            'SELECT login.id_user, login.password, login.username, login.activity, karyawan.nik, login.hak_akses, login.mac, karyawan.nama, karyawan.status_aktif, unit.nm_unit, jabatan.nm_jabatan
+             FROM login JOIN karyawan ON login.nik = karyawan.nik JOIN unit ON karyawan.id_unit = unit.id_unit JOIN jabatan ON karyawan.id_jabatan = jabatan.id_jabatan;
              WHERE NIK = ?'
         );
         $stmt->execute([$authUser['nik']]);
@@ -99,6 +102,7 @@ class AuthController
         jsonSuccess('Berhasil mengambil data user', [
             'nik'        => $user['NIK'],
             'username'   => $user['Username'],
+            'nama'       => $user['Nama'],
             'id_unit'    => $user['ID_unit'],
             'id_jabatan' => $user['ID_jabatan'],
         ]);
