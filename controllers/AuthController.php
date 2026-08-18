@@ -50,6 +50,11 @@ class AuthController
             jsonError('Username atau password salah', 401);
         }
 
+        // Validasi status aktif user
+        if ($user['status_aktif'] !== 'Aktif') {
+            jsonError('Akun tidak aktif. Silakan hubungi admin', 403);
+        }
+
         // Buat payload JWT dari data user (tanpa password)
         $payload = [
             'nik'        => $user['nik'],
@@ -137,7 +142,7 @@ class AuthController
         $pdo = require __DIR__ . '/../config/database.php';
 
         // Ambil hash password saat ini milik user (NIK dari token, bukan dari body)
-        $stmt = $pdo->prepare('SELECT Password FROM login WHERE NIK = ?');
+        $stmt = $pdo->prepare('SELECT password FROM login WHERE nik = ?');
         $stmt->execute([$authUser['nik']]);
         $user = $stmt->fetch();
 
@@ -153,59 +158,7 @@ class AuthController
         // Hash password baru, lalu update
         $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
 
-        $updateStmt = $pdo->prepare('UPDATE login SET Password = ? WHERE NIK = ?');
-        $updateStmt->execute([$newHash, $authUser['nik']]);
-
-        // Kirim response sukses
-        jsonSuccess('Password berhasil diubah');
-    }
-
-    // Mengganti Username
-    public function changeUsername(): void
-    {
-        // Verifikasi token
-        $authUser = requireAuth();
-
-        // Ambil dan decode body JSON
-        $input = json_decode(file_get_contents('php://input'), true);
-
-        if (!is_array($input)) {
-            jsonError('Body request tidak valid (harus JSON)', 400);
-        }
-
-        $oldPassword = (string) ($input['old_password'] ?? '');
-        $newPassword = (string) ($input['new_password'] ?? '');
-
-        // Validasi input
-        if ($oldPassword === '' || $newPassword === '') {
-            jsonError('Password lama dan password baru wajib diisi', 400);
-        }
-
-        if (strlen($newPassword) < 6) {
-            jsonError('Password baru minimal 6 karakter', 400);
-        }
-
-        // Ambil koneksi database
-        $pdo = require __DIR__ . '/../config/database.php';
-
-        // Ambil hash password saat ini milik user (NIK dari token, bukan dari body)
-        $stmt = $pdo->prepare('SELECT Password FROM login WHERE NIK = ?');
-        $stmt->execute([$authUser['nik']]);
-        $user = $stmt->fetch();
-
-        if ($user === false) {
-            jsonError('User tidak ditemukan', 404);
-        }
-
-        // Verifikasi password lama sebelum mengizinkan perubahan
-        if (!password_verify($oldPassword, $user['Password'])) {
-            jsonError('Password lama tidak sesuai', 401);
-        }
-
-        // Hash password baru, lalu update
-        $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
-
-        $updateStmt = $pdo->prepare('UPDATE login SET Password = ? WHERE NIK = ?');
+        $updateStmt = $pdo->prepare('UPDATE login SET password = ? WHERE nik = ?');
         $updateStmt->execute([$newHash, $authUser['nik']]);
 
         // Kirim response sukses

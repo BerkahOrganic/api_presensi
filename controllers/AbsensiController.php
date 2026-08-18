@@ -46,7 +46,7 @@ class AbsensiController
 
         // Cek apakah user sudah check-in hari ini
         $cekStmt = $pdo->prepare(
-            'SELECT ID_absensi FROM absensi WHERE NIK = ? AND Tanggal = CURDATE()'
+            'SELECT id_absensi FROM absensi WHERE nik = ? AND tanggal = CURDATE()'
         );
         $cekStmt->execute([$authUser['nik']]);
 
@@ -57,7 +57,7 @@ class AbsensiController
         // Insert record absensi baru
         $insertStmt = $pdo->prepare(
             'INSERT INTO absensi
-                (Tanggal, NIK, ID_unit, ID_jabatan, Masuk, Absensi, Keterangan, Longitude, Latitude)
+                (tanggal, nik, id_unit, id_jabatan, masuk, absensi, ket, longitude, latitude)
              VALUES
                 (CURDATE(), ?, ?, ?, CURTIME(), ?, ?, ?, ?)'
         );
@@ -75,19 +75,19 @@ class AbsensiController
 
         // Ambil kembali data yang baru diinsert untuk response
         $dataStmt = $pdo->prepare(
-            'SELECT ID_absensi, Tanggal, Masuk, Absensi
+            'SELECT id_absensi, tanggal, masuk, absensi
              FROM absensi
-             WHERE ID_absensi = ?'
+             WHERE id_absensi = ?'
         );
         $dataStmt->execute([$idAbsensi]);
         $data = $dataStmt->fetch();
 
         // Kirim response sukses
         jsonSuccess('Check-in berhasil', [
-            'id_absensi' => (int) $data['ID_absensi'],
-            'tanggal'    => $data['Tanggal'],
-            'masuk'      => $data['Masuk'],
-            'absensi'    => $data['Absensi'],
+            'id_absensi' => (int) $data['id_absensi'],
+            'tanggal'    => $data['tanggal'],
+            'masuk'      => $data['masuk'],
+            'absensi'    => $data['absensi'],
         ], 201);
     }
 
@@ -117,7 +117,7 @@ class AbsensiController
 
         // Cari record absensi hari ini milik user ini
         $cekStmt = $pdo->prepare(
-            'SELECT ID_absensi, Keluar FROM absensi WHERE NIK = ? AND Tanggal = CURDATE()'
+            'SELECT id_absensi, keluar FROM absensi WHERE nik = ? AND tanggal = CURDATE()'
         );
         $cekStmt->execute([$authUser['nik']]);
         $record = $cekStmt->fetch();
@@ -133,26 +133,26 @@ class AbsensiController
         // Update jam keluar + lokasi baru
         $updateStmt = $pdo->prepare(
             'UPDATE absensi
-             SET Keluar = CURTIME(), Longitude = ?, Latitude = ?
-             WHERE NIK = ? AND Tanggal = CURDATE()'
+             SET keluar = CURTIME(), longitude = ?, latitude = ?
+             WHERE nik = ? AND tanggal = CURDATE()'
         );
         $updateStmt->execute([$longitude, $latitude, $authUser['nik']]);
 
         // Ambil kembali data terbaru untuk response
         $dataStmt = $pdo->prepare(
-            'SELECT ID_absensi, Tanggal, Masuk, Keluar
+            'SELECT id_absensi, tanggal, masuk, keluar
              FROM absensi
-             WHERE ID_absensi = ?'
+             WHERE id_absensi = ?'
         );
-        $dataStmt->execute([$record['ID_absensi']]);
+        $dataStmt->execute([$record['id_absensi']]);
         $data = $dataStmt->fetch();
 
         // Kirim response sukses
         jsonSuccess('Check-out berhasil', [
-            'id_absensi' => (int) $data['ID_absensi'],
-            'tanggal'    => $data['Tanggal'],
-            'masuk'      => $data['Masuk'],
-            'keluar'     => $data['Keluar'],
+            'id_absensi' => (int) $data['id_absensi'],
+            'tanggal'    => $data['tanggal'],
+            'masuk'      => $data['masuk'],
+            'keluar'     => $data['keluar'],
         ]);
     }
 
@@ -167,9 +167,9 @@ class AbsensiController
 
         // Ambil record absensi hari ini milik user ini
         $stmt = $pdo->prepare(
-            'SELECT ID_absensi, Tanggal, Masuk, Keluar, Absensi, Keterangan, Longitude, Latitude
+            'SELECT id_absensi, tanggal, masuk, keluar, absensi, keterangan, longitude, latitude
              FROM absensi
-             WHERE NIK = ? AND Tanggal = CURDATE()'
+             WHERE nik = ? AND tanggal = CURDATE()'
         );
         $stmt->execute([$authUser['nik']]);
         $data = $stmt->fetch();
@@ -180,14 +180,14 @@ class AbsensiController
 
         // Kirim data yang ditemukan
         jsonSuccess('Data absensi hari ini ditemukan', [
-            'id_absensi' => (int) $data['ID_absensi'],
-            'tanggal'    => $data['Tanggal'],
-            'masuk'      => $data['Masuk'],
-            'keluar'     => $data['Keluar'],
-            'absensi'    => $data['Absensi'],
-            'keterangan' => $data['Keterangan'],
-            'longitude'  => $data['Longitude'],
-            'latitude'   => $data['Latitude'],
+            'id_absensi' => (int) $data['id_absensi'],
+            'tanggal'    => $data['tanggal'],
+            'masuk'      => $data['masuk'],
+            'keluar'     => $data['keluar'],
+            'absensi'    => $data['absensi'],
+            'keterangan' => $data['ket'],
+            'longitude'  => $data['longitude'],
+            'latitude'   => $data['latitude'],
         ]);
     }
 
@@ -220,18 +220,18 @@ class AbsensiController
         // Query dengan atau tanpa filter tanggal
         if ($dari !== null && $sampai !== null) {
             $stmt = $pdo->prepare(
-                'SELECT ID_absensi, Tanggal, Masuk, Keluar, Absensi, Keterangan
+                'SELECT id_absensi, tanggal, masuk, keluar, absensi, ket
                  FROM absensi
-                 WHERE NIK = ? AND Tanggal BETWEEN ? AND ?
-                 ORDER BY Tanggal DESC'
+                 WHERE nik = ? AND tanggal BETWEEN ? AND ?
+                 ORDER BY tanggal DESC'
             );
             $stmt->execute([$authUser['nik'], $dari, $sampai]);
         } else {
             $stmt = $pdo->prepare(
-                'SELECT ID_absensi, Tanggal, Masuk, Keluar, Absensi, Keterangan
+                'SELECT id_absensi, tanggal, masuk, keluar, absensi, ket
                  FROM absensi
-                 WHERE NIK = ?
-                 ORDER BY Tanggal DESC'
+                 WHERE nik = ?
+                 ORDER BY tanggal DESC'
             );
             $stmt->execute([$authUser['nik']]);
         }
@@ -242,11 +242,11 @@ class AbsensiController
         $data = array_map(static function (array $row): array {
             return [
                 'id_absensi' => (int) $row['ID_absensi'],
-                'tanggal'    => $row['Tanggal'],
-                'masuk'      => $row['Masuk'],
-                'keluar'     => $row['Keluar'],
-                'absensi'    => $row['Absensi'],
-                'keterangan' => $row['Keterangan'],
+                'tanggal'    => $row['tanggal'],
+                'masuk'      => $row['masuk'],
+                'keluar'     => $row['keluar'],
+                'absensi'    => $row['absensi'],
+                'keterangan' => $row['ket'],
             ];
         }, $rows);
 
@@ -273,9 +273,9 @@ class AbsensiController
 
         // Ambil data 
         $stmt = $pdo->prepare(
-            'SELECT ID_absensi, Tanggal, Masuk, Keluar, Absensi, Keterangan, Longitude, Latitude
+            'SELECT id_absensi, tanggal, masuk, keluar, absensi, ket, longitude, latitude
              FROM absensi
-             WHERE ID_absensi = ? AND NIK = ?'
+             WHERE id_absensi = ? AND nik = ?'
         );
         $stmt->execute([(int) $id, $authUser['nik']]);
         $data = $stmt->fetch();
@@ -286,14 +286,14 @@ class AbsensiController
 
         // Kirim response sukses
         jsonSuccess('Berhasil mengambil detail absensi', [
-            'id_absensi' => (int) $data['ID_absensi'],
-            'tanggal'    => $data['Tanggal'],
-            'masuk'      => $data['Masuk'],
-            'keluar'     => $data['Keluar'],
-            'absensi'    => $data['Absensi'],
-            'keterangan' => $data['Keterangan'],
-            'longitude'  => $data['Longitude'],
-            'latitude'   => $data['Latitude'],
+            'id_absensi' => (int) $data['id_absensi'],
+            'tanggal'    => $data['tanggal'],
+            'masuk'      => $data['masuk'],
+            'keluar'     => $data['keluar'],
+            'absensi'    => $data['absensi'],
+            'keterangan' => $data['ket'],
+            'longitude'  => $data['longitude'],
+            'latitude'   => $data['latitude'],
         ]);
     }
 
