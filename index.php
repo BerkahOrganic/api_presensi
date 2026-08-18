@@ -29,7 +29,7 @@ if ($path === '') {
 $routes = [
     'POST /api/auth/login'           => [AuthController::class, 'login'], //Login
     'GET /api/auth/me'               => [AuthController::class, 'me'], //Profil
-    'PUT /api/auth/change-password'  => [AuthController::class, 'changePassword'], //Ganti Password
+    //'PUT /api/auth/change-password'  => [AuthController::class, 'changePassword'], //Ganti Password
 
     'POST /api/absensi/checkin'      => [AbsensiController::class, 'checkin'], //Absensi masuk
     'PUT /api/absensi/checkout'      => [AbsensiController::class, 'checkout'], //Absensi pulang
