@@ -46,17 +46,17 @@ class AuthController
         $user = $stmt->fetch();
 
         // Jika username tidak ditemukan ATAU password salah,
-        if ($user === false || !password_verify($password, $user['Password'])) {
+        if ($user === false || !password_verify($password, $user['password'])) {
             jsonError('Username atau password salah', 401);
         }
 
         // Buat payload JWT dari data user (tanpa password)
         $payload = [
-            'nik'        => $user['NIK'],
-            'username'   => $user['Username'],
-            'nama'       => $user['Nama'],
-            'id_unit'    => $user['ID_unit'],
-            'id_jabatan' => $user['ID_jabatan'],
+            'nik'        => $user['nik'],
+            'username'   => $user['username'],
+            'nama'       => $user['nama'],
+            'id_unit'    => $user['id_unit'],
+            'id_jabatan' => $user['id_jabatan'],
         ];
 
         $token = generateJWT($payload);
@@ -65,12 +65,12 @@ class AuthController
         jsonSuccess('Login berhasil', [
             'token' => $token,
             'user'  => [
-                'nik'        => $user['NIK'],
-                'username'   => $user['Username'],
-                'nama'       => $user['Nama'],
-                'status_aktif' => $user['Status_aktif'],
-                'id_unit'    => $user['ID_unit'],
-                'id_jabatan' => $user['ID_jabatan'],
+                'nik'        => $user['nik'],
+                'username'   => $user['username'],
+                'nama'       => $user['nama'],
+                'status_aktif' => $user['status_aktif'],
+                'id_unit'    => $user['id_unit'],
+                'id_jabatan' => $user['id_jabatan'],
             ],
         ]);
     }
@@ -100,11 +100,11 @@ class AuthController
 
         // Kirim response sukses
         jsonSuccess('Berhasil mengambil data user', [
-            'nik'        => $user['NIK'],
-            'username'   => $user['Username'],
-            'nama'       => $user['Nama'],
-            'id_unit'    => $user['ID_unit'],
-            'id_jabatan' => $user['ID_jabatan'],
+            'nik'        => $user['nik'],
+            'username'   => $user['username'],
+            'nama'       => $user['nama'],
+            'id_unit'    => $user['id_unit'],
+            'id_jabatan' => $user['id_jabatan'],
         ]);
     }
 
