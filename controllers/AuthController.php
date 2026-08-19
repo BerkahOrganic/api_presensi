@@ -91,8 +91,21 @@ class AuthController
 
         // Ambil data terbaru dari database berdasarkan NIK di token
         $stmt = $pdo->prepare(
-            'SELECT login.id_user, login.password, login.username, login.activity, karyawan.nik, login.hak_akses, login.mac, karyawan.nama, karyawan.status_aktif, unit.nm_unit, jabatan.nm_jabatan
-             FROM login JOIN karyawan ON login.nik = karyawan.nik JOIN unit ON karyawan.id_unit = unit.id_unit JOIN jabatan ON karyawan.id_jabatan = jabatan.id_jabatan;
+            'SELECT
+             login.id_user, 
+             login.password, 
+             login.username, 
+             login.activity, 
+             karyawan.nik, 
+             login.hak_akses, 
+             login.mac, 
+             karyawan.nama, 
+             karyawan.status_aktif, 
+             unit.id_unit, 
+             unit.nm_unit, 
+             jabatan.id_jabatan, 
+             jabatan.nm_jabatan
+             FROM login JOIN karyawan ON login.nik = karyawan.nik JOIN unit ON karyawan.id_unit = unit.id_unit JOIN jabatan ON karyawan.id_jabatan = jabatan.id_jabatan
              WHERE NIK = ?'
         );
         $stmt->execute([$authUser['nik']]);
@@ -109,7 +122,9 @@ class AuthController
             'username'   => $user['username'],
             'nama'       => $user['nama'],
             'id_unit'    => $user['id_unit'],
+            'nm_unit'   => $user['nm_unit'],
             'id_jabatan' => $user['id_jabatan'],
+            'nm_jabatan' => $user['nm_jabatan'],
         ]);
     }
 
