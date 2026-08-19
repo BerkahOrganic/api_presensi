@@ -106,7 +106,7 @@ class AuthController
              jabatan.id_jabatan, 
              jabatan.nm_jabatan
              FROM login JOIN karyawan ON login.nik = karyawan.nik JOIN unit ON karyawan.id_unit = unit.id_unit JOIN jabatan ON karyawan.id_jabatan = jabatan.id_jabatan
-             WHERE NIK = ?'
+             WHERE login.nik = ?'
         );
         $stmt->execute([$authUser['nik']]);
         $user = $stmt->fetch();
