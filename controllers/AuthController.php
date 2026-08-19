@@ -38,9 +38,13 @@ class AuthController
 
         // Cari user berdasarkan username
         $stmt = $pdo->prepare(
-            'SELECT login.id_user, login.password, login.username, login.activity, karyawan.nik, login.hak_akses, login.mac, karyawan.nama, karyawan.status_aktif, karyawan.id_unit, karyawan.id_jabatan
-             FROM login JOIN karyawan ON login.nik = karyawan.nik
-             WHERE Username = ?'
+            'SELECT l.password, l.username, k.nik, k.nama, k.status_aktif,
+                    k.id_unit, u.nm_unit, k.id_jabatan, j.nm_jabatan
+             FROM login l
+             JOIN karyawan k ON l.nik = k.nik
+             JOIN unit u ON k.id_unit = u.id_unit
+             JOIN jabatan j ON k.id_jabatan = j.id_jabatan
+             WHERE l.username = ?'
         );
         $stmt->execute([$username]);
         $user = $stmt->fetch();
@@ -61,7 +65,9 @@ class AuthController
             'username'   => $user['username'],
             'nama'       => $user['nama'],
             'id_unit'    => $user['id_unit'],
+            'nm_unit'    => $user['nm_unit'],
             'id_jabatan' => $user['id_jabatan'],
+            'nm_jabatan' => $user['nm_jabatan'],
         ];
 
         $token = generateJWT($payload);
@@ -73,9 +79,10 @@ class AuthController
                 'nik'        => $user['nik'],
                 'username'   => $user['username'],
                 'nama'       => $user['nama'],
-                'status_aktif' => $user['status_aktif'],
                 'id_unit'    => $user['id_unit'],
+                'nm_unit'    => $user['nm_unit'],
                 'id_jabatan' => $user['id_jabatan'],
+                'nm_jabatan' => $user['nm_jabatan'],
             ],
         ]);
     }
@@ -91,22 +98,13 @@ class AuthController
 
         // Ambil data terbaru dari database berdasarkan NIK di token
         $stmt = $pdo->prepare(
-            'SELECT
-             login.id_user, 
-             login.password, 
-             login.username, 
-             login.activity, 
-             karyawan.nik, 
-             login.hak_akses, 
-             login.mac, 
-             karyawan.nama, 
-             karyawan.status_aktif, 
-             unit.id_unit, 
-             unit.nm_unit, 
-             jabatan.id_jabatan, 
-             jabatan.nm_jabatan
-             FROM login JOIN karyawan ON login.nik = karyawan.nik JOIN unit ON karyawan.id_unit = unit.id_unit JOIN jabatan ON karyawan.id_jabatan = jabatan.id_jabatan
-             WHERE NIK = ?'
+            'SELECT l.username, k.nik, k.nama,
+                    k.id_unit, u.nm_unit, k.id_jabatan, j.nm_jabatan
+             FROM login l
+             JOIN karyawan k ON l.nik = k.nik
+             JOIN unit u ON k.id_unit = u.id_unit
+             JOIN jabatan j ON k.id_jabatan = j.id_jabatan
+             WHERE k.nik = ?'
         );
         $stmt->execute([$authUser['nik']]);
         $user = $stmt->fetch();
