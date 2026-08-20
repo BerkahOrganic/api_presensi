@@ -10,7 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-$token = "$A!BC@D#E$F%G^H&I*J(K)L+M-N=O_P{Q}R[S]T|U:V;W<X>Y?Z";
+$token = $_ENV['API_TOKEN'] ?? null;
 
 $headers = apache_request_headers();
 
