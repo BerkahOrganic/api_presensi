@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 const DB_HOST = 'localhost';
 const DB_NAME = 'db_bekah_presensi';
-const DB_USER = 'root';
-const DB_PASS = '';
+const DB_USER = 'B3rk4h_26';
+const DB_PASS = '#Berkah_App#26';
 const DB_CHARSET = 'utf8mb4';
 
 $dsn = 'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=' . DB_CHARSET;
