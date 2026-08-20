@@ -34,11 +34,18 @@ class AbsensiController
 
         $latitude   = trim((string) ($input['latitude'] ?? ''));
         $longitude  = trim((string) ($input['longitude'] ?? ''));
+        $status     = trim((string) ($input['status'] ?? ''));
         $keterangan = $input['keterangan'] ?? null;
+        $fotoBase64 = $input['foto_base64'] ?? null;
 
         // Validasi input
         if ($latitude === '' || $longitude === '') {
             jsonError('Latitude dan longitude wajib diisi', 400);
+        }
+
+        $statusValid = ['H', 'I', 'S'];
+        if (!in_array($status, $statusValid, true)) {
+            jsonError('Status tidak valid (harus H, I, atau S)', 400);
         }
 
         // Ambil koneksi database
@@ -54,19 +61,31 @@ class AbsensiController
             jsonError('Anda sudah melakukan check-in hari ini', 409);
         }
 
+        if (is_string($fotoBase64) && $fotoBase64 !== '') {
+            $fotoPath = $this->simpanFotoBukti($authUser['nik'], $fotoBase64);
+
+            if ($fotoPath === null) {
+                jsonError('Gagal menyimpan foto bukti (format tidak didukung)', 400);
+            }
+        }
+
+        $masuk = ($status === 'H') ? date('H:i:s') : null;
+
         // Insert record absensi baru
         $insertStmt = $pdo->prepare(
             'INSERT INTO absensi
-                (tanggal, nik, id_unit, id_jabatan, masuk, absensi, ket, longitude, latitude)
+                (tanggal, nik, id_unit, id_jabatan, masuk, absensi, ket, foto_bukti, longitude, latitude)
              VALUES
-                (CURDATE(), ?, ?, ?, CURTIME(), ?, ?, ?, ?)'
+                (CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $insertStmt->execute([
             $authUser['nik'],
             $authUser['id_unit'],
             $authUser['id_jabatan'],
-            'H',
+            $masuk,
+            $status,
             $keterangan,
+            $fotoPath,
             $longitude,
             $latitude,
         ]);
@@ -75,7 +94,7 @@ class AbsensiController
 
         // Ambil kembali data yang baru diinsert untuk response
         $dataStmt = $pdo->prepare(
-            'SELECT id_absensi, tanggal, masuk, absensi
+            'SELECT id_absensi, tanggal, masuk, absensi, foto_bukti
              FROM absensi
              WHERE id_absensi = ?'
         );
@@ -83,12 +102,50 @@ class AbsensiController
         $data = $dataStmt->fetch();
 
         // Kirim response sukses
-        jsonSuccess('Check-in berhasil', [
+        jsonSuccess('Absensi berhasil dikirim', [
             'id_absensi' => (int) $data['id_absensi'],
             'tanggal'    => $data['tanggal'],
             'masuk'      => $data['masuk'],
             'absensi'    => $data['absensi'],
+            'foto_bukti' => $data['foto_bukti'],
         ], 201);
+    }
+
+    private function simpanFotoBukti(string $nik, string $base64): ?string
+    {
+        // Format umum dari Flutter: "data:image/jpeg;base64,xxxxxx"
+        $extension = 'jpg';
+        if (preg_match('/^data:image\/(\w+);base64,/', $base64, $matches)) {
+            $extension = strtolower($matches[1]);
+            $base64 = substr($base64, strpos($base64, ',') + 1);
+        }
+
+        $allowedExtensions = ['jpg', 'jpeg', 'png'];
+        if (!in_array($extension, $allowedExtensions, true)) {
+            return null;
+        }
+
+        $decoded = base64_decode($base64, true);
+        if ($decoded === false) {
+            return null;
+        }
+
+        $uploadDir = __DIR__ . '/../uploads/absensi/';
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0755, true);
+        }
+
+        $filename = $nik . '_' . date('YmdHis') . '.' . $extension;
+        $fullPath = $uploadDir . $filename;
+
+        if (file_put_contents($fullPath, $decoded) === false) {
+            return null;
+        }
+
+        // Simpan PATH RELATIF di database (bukan path absolute server),
+        // supaya gampang dipakai bikin URL lengkap nanti di dashboard admin
+        // (tinggal digabung: baseUrl + '/' + foto_bukti).
+        return 'uploads/absensi/' . $filename;
     }
 
     // Absen Keluar
@@ -117,7 +174,7 @@ class AbsensiController
 
         // Cari record absensi hari ini milik user ini
         $cekStmt = $pdo->prepare(
-            'SELECT id_absensi, keluar FROM absensi WHERE nik = ? AND tanggal = CURDATE()'
+            'SELECT id_absensi, keluar, absensi FROM absensi WHERE nik = ? AND tanggal = CURDATE()'
         );
         $cekStmt->execute([$authUser['nik']]);
         $record = $cekStmt->fetch();
@@ -126,7 +183,11 @@ class AbsensiController
             jsonError('Anda belum melakukan check-in hari ini', 404);
         }
 
-        if ($record['Keluar'] !== null) {
+        if ($record['absensi'] !== 'H') {
+            jsonError('Absensi hari ini berstatus Izin/Sakit, tidak perlu check-out', 400);
+        }
+
+        if ($record['keluar'] !== null) {
             jsonError('Anda sudah melakukan check-out hari ini', 409);
         }
 
