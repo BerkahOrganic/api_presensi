@@ -1,8 +1,63 @@
 <?php
 
-
-
 declare(strict_types=1);
+
+require_once __DIR__ . '/vendor/autoload.php';
+
+try {
+    $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+    $dotenv->load();
+} catch (Exception $e) {
+    error_log('Failed to load .env file: ' . $e->getMessage());
+    http_response_code(500);
+    header('Content-Type: application/json');
+    echo json_encode([
+        'success' => false,
+        'message' => 'Gagal memuat konfigurasi. Silakan coba lagi nanti.',
+        'data'    => null,
+    ]);
+    exit;
+}
+
+$token = $_ENV['API_TOKEN'] ?? null;
+
+header("Access-Control-Allow-Origin: *");
+header("Content-Type: application/json; charset=UTF-8");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS"); // Tambahkan OPTIONS di sini
+header("Access-Control-Allow-Headers: X-API-KEY, Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
+
+$headers = apache_request_headers();
+
+// Ubah key header menjadi lowercase atau sesuaikan dengan case-sensitive apache
+// Beberapa server membaca X-API-KEY menjadi X-Api-Key atau x-api-key
+$clientToken = null;
+foreach ($headers as $key => $value) {
+    if (strcasecmp($key, 'X-API-KEY') === 0) {
+        $clientToken = $value;
+        break;
+    }
+}
+
+if ($clientToken === null || isset($_SERVER['HTTP_X_API_KEY'])) {
+    $clientToken = $_SERVER['HTTP_X_API_KEY'] ?? null;
+}
+
+// Validasi token
+if ($clientToken === null || $clientToken !== $token) {
+    http_response_code(401);
+    echo json_encode([
+        'status' => false,
+        'message' => 'Akses ditolak! Token API tidak valid'
+    ]);
+    exit; // Stop proses, jangan izinkan masuk ke routing dan database
+}
+
+
 
 require_once __DIR__ . '/helpers/response.php';
 require_once __DIR__ . '/controllers/AuthController.php';
