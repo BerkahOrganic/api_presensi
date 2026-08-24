@@ -62,6 +62,12 @@ if ($clientToken === null || $clientToken !== $token) {
 require_once __DIR__ . '/helpers/response.php';
 require_once __DIR__ . '/controllers/AuthController.php';
 require_once __DIR__ . '/controllers/AbsensiController.php';
+require_once __DIR__ . '/controllers/WajahController.php';
+
+header("Access-Control-Allow-Origin: *");
+header("Content-Type: application/json; charset=UTF-8");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE");
+header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
 $requestUri  = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $method      = $_SERVER['REQUEST_METHOD'];
@@ -93,6 +99,9 @@ $routes = [
     'GET /api/absensi/today'         => [AbsensiController::class, 'today'], //Status harian
     'GET /api/absensi/riwayat'       => [AbsensiController::class, 'riwayat'], //Riwayat presensi
     'GET /api/absensi/detail'        => [AbsensiController::class, 'detail'], //Detail presensi
+
+    'POST /api/wajah/enroll'         => [WajahController::class, 'enroll'], //Daftarkan wajah referensi
+    'POST /api/absensi/verify-face'  => [WajahController::class, 'verifikasi'], //Cocokkan wajah saat absen
 ];
 
 $routeKey = $method . ' ' . $path;
