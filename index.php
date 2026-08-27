@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+date_default_timezone_set('Asia/Jakarta');
+
 require_once __DIR__ . '/vendor/autoload.php';
 
 try {
@@ -63,6 +65,7 @@ require_once __DIR__ . '/helpers/response.php';
 require_once __DIR__ . '/controllers/AuthController.php';
 require_once __DIR__ . '/controllers/AbsensiController.php';
 require_once __DIR__ . '/controllers/WajahController.php';
+require_once __DIR__ . '/controllers/VersionController.php';
 
 header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json; charset=UTF-8");
@@ -92,7 +95,7 @@ if ($path === '') {
 $routes = [
     'POST /api/auth/login'           => [AuthController::class, 'login'], //Login
     'GET /api/auth/me'               => [AuthController::class, 'me'], //Profil
-    //'PUT /api/auth/change-password'  => [AuthController::class, 'changePassword'], //Ganti Password
+    'PUT /api/auth/change-password'  => [AuthController::class, 'changePassword'], //Ganti Password
 
     'POST /api/absensi/checkin'      => [AbsensiController::class, 'checkin'], //Absensi masuk
     'PUT /api/absensi/checkout'      => [AbsensiController::class, 'checkout'], //Absensi pulang
@@ -102,6 +105,10 @@ $routes = [
 
     'POST /api/wajah/enroll'         => [WajahController::class, 'enroll'], //Daftarkan wajah referensi
     'POST /api/absensi/verify-face'  => [WajahController::class, 'verifikasi'], //Cocokkan wajah saat absen
+
+    'GET /api/absensi/batas-waktu'   => [AbsensiController::class, 'batasWaktu'], //Ambil batas waktu absensi
+
+    'GET /api/app-version'           => [AppVersionController::class, 'getVersion'] //Ambil informasi versi aplikasi
 ];
 
 $routeKey = $method . ' ' . $path;
