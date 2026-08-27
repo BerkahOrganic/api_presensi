@@ -164,7 +164,7 @@ class AuthController
         }
 
         // Verifikasi password lama sebelum mengizinkan perubahan
-        if (!password_verify($oldPassword, $user['Password'])) {
+        if (!password_verify($oldPassword, $user['password'])) {
             jsonError('Password lama tidak sesuai', 401);
         }
 

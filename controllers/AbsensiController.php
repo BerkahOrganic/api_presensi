@@ -51,11 +51,23 @@ class AbsensiController
         // Ambil koneksi database
         $pdo = require __DIR__ . '/../config/database.php';
 
+        if ($status === 'H') {
+            $jamBatas = $this->resolveBatasWaktu($pdo, $authUser['nik'], $authUser['id_unit']);
+            if ($jamBatas !== null && date('H:i:s') > $jamBatas) {
+                jsonError(
+                    "Sudah melewati batas waktu absen Hadir ({$jamBatas}). Silakan pilih Izin/Sakit.",
+                    400
+                );
+            }
+        }
+
+        $tanggalHariIni = date('Y-m-d');
+
         // Cek apakah user sudah check-in hari ini
         $cekStmt = $pdo->prepare(
-            'SELECT id_absensi FROM absensi WHERE nik = ? AND tanggal = CURDATE()'
+            'SELECT id_absensi FROM absensi WHERE nik = ? AND tanggal = ?'
         );
-        $cekStmt->execute([$authUser['nik']]);
+        $cekStmt->execute([$authUser['nik'], $tanggalHariIni]);
 
         if ($cekStmt->fetch() !== false) {
             jsonError('Anda sudah melakukan check-in hari ini', 409);
@@ -77,9 +89,10 @@ class AbsensiController
             'INSERT INTO absensi
                 (tanggal, nik, id_unit, id_jabatan, masuk, absensi, ket, foto_bukti, longitude, latitude)
              VALUES
-                (CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $insertStmt->execute([
+            $tanggalHariIni,
             $authUser['nik'],
             $authUser['id_unit'],
             $authUser['id_jabatan'],
@@ -173,11 +186,14 @@ class AbsensiController
         // Ambil koneksi database
         $pdo = require __DIR__ . '/../config/database.php';
 
+        $tanggalHariIni = date('Y-m-d');
+        $jamSekarang = date('H:i:s');
+
         // Cari record absensi hari ini milik user ini
         $cekStmt = $pdo->prepare(
-            'SELECT id_absensi, keluar, absensi FROM absensi WHERE nik = ? AND tanggal = CURDATE()'
+            'SELECT id_absensi, keluar, absensi FROM absensi WHERE nik = ? AND tanggal = ?'
         );
-        $cekStmt->execute([$authUser['nik']]);
+        $cekStmt->execute([$authUser['nik'], $tanggalHariIni]);
         $record = $cekStmt->fetch();
 
         if ($record === false) {
@@ -196,9 +212,9 @@ class AbsensiController
         $updateStmt = $pdo->prepare(
             'UPDATE absensi
              SET keluar = CURTIME(), longitude = ?, latitude = ?
-             WHERE nik = ? AND tanggal = CURDATE()'
+             WHERE nik = ? AND tanggal = ?'
         );
-        $updateStmt->execute([$longitude, $latitude, $authUser['nik']]);
+        $updateStmt->execute([$longitude, $latitude, $authUser['nik'], $tanggalHariIni]);
 
         // Ambil kembali data terbaru untuk response
         $dataStmt = $pdo->prepare(
@@ -229,11 +245,11 @@ class AbsensiController
 
         // Ambil record absensi hari ini milik user ini
         $stmt = $pdo->prepare(
-            'SELECT id_absensi, tanggal, masuk, keluar, absensi, keterangan, longitude, latitude
+            'SELECT id_absensi, tanggal, masuk, keluar, absensi, ket, longitude, latitude
              FROM absensi
-             WHERE nik = ? AND tanggal = CURDATE()'
+             WHERE nik = ? AND tanggal = ?'
         );
-        $stmt->execute([$authUser['nik']]);
+        $stmt->execute([$authUser['nik'], date('Y-m-d')]);
         $data = $stmt->fetch();
 
         if ($data === false) {
@@ -247,7 +263,7 @@ class AbsensiController
             'masuk'      => $data['masuk'],
             'keluar'     => $data['keluar'],
             'absensi'    => $data['absensi'],
-            'keterangan' => $data['ket'],
+            'ket' => $data['ket'],
             'longitude'  => $data['longitude'],
             'latitude'   => $data['latitude'],
         ]);
@@ -303,7 +319,7 @@ class AbsensiController
         // Bentuk ulang array agar key konsisten (lowercase) dengan endpoint lain
         $data = array_map(static function (array $row): array {
             return [
-                'id_absensi' => (int) $row['ID_absensi'],
+                'id_absensi' => (int) $row['id_absensi'],
                 'tanggal'    => $row['tanggal'],
                 'masuk'      => $row['masuk'],
                 'keluar'     => $row['keluar'],
@@ -357,6 +373,54 @@ class AbsensiController
             'longitude'  => $data['longitude'],
             'latitude'   => $data['latitude'],
         ]);
+    }
+
+    public function batasWaktu(): void
+    {
+        $authUser = requireAuth();
+
+        $pdo = require __DIR__ . '/../config/database.php';
+
+        $jamBatas = $this->resolveBatasWaktu($pdo, $authUser['nik'], $authUser['id_unit']);
+
+        jsonSuccess('Berhasil mengambil batas waktu', [
+            'jam_batas' => $jamBatas,
+        ]);
+    }
+
+    private function resolveBatasWaktu(PDO $pdo, string $nik, string $idUnit): ?string
+    {
+        $stmt = $pdo->prepare(
+            "SELECT jam_batas FROM batas_waktu_hadir
+             WHERE scope_type = 'karyawan' AND scope_value = ?
+             LIMIT 1"
+        );
+        $stmt->execute([$nik]);
+        $row = $stmt->fetch();
+        if ($row !== false) {
+            return $row['jam_batas'];
+        }
+
+        $stmt = $pdo->prepare(
+            "SELECT jam_batas FROM batas_waktu_hadir
+             WHERE scope_type = 'unit' AND scope_value = ?
+             LIMIT 1"
+        );
+        $stmt->execute([$idUnit]);
+        $row = $stmt->fetch();
+        if ($row !== false) {
+            return $row['jam_batas'];
+        }
+
+        $stmt = $pdo->prepare(
+            "SELECT jam_batas FROM batas_waktu_hadir
+             WHERE scope_type = 'semua'
+             LIMIT 1"
+        );
+        $stmt->execute();
+        $row = $stmt->fetch();
+
+        return $row !== false ? $row['jam_batas'] : null;
     }
 
     private function isValidDate(string $date): bool
