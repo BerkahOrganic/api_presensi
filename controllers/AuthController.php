@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers/response.php';
 require_once __DIR__ . '/../helpers/jwt.php';
+require_once __DIR__ . '/../helpers/face.php';
 require_once __DIR__ . '/../middleware/auth.php';
 
 class AuthController
@@ -114,15 +115,23 @@ class AuthController
             jsonError('User tidak ditemukan', 404);
         }
 
+        // Cek apakah user ini sudah punya wajah referensi tersimpan —
+        // dipakai Flutter untuk menentukan label tombol di halaman Profil
+        // ("DAFTARKAN WAJAH" kalau belum ada, "UPDATE WAJAH" kalau sudah ada).
+        $wajahStmt = $pdo->prepare('SELECT 1 FROM wajah_referensi WHERE nik = ?');
+        $wajahStmt->execute([$authUser['nik']]);
+        $wajahTerdaftar = $wajahStmt->fetch() !== false;
+
         // Kirim response sukses
         jsonSuccess('Berhasil mengambil data user', [
-            'nik'        => $user['nik'],
-            'username'   => $user['username'],
-            'nama'       => $user['nama'],
-            'id_unit'    => $user['id_unit'],
-            'nm_unit'   => $user['nm_unit'],
-            'id_jabatan' => $user['id_jabatan'],
-            'nm_jabatan' => $user['nm_jabatan'],
+            'nik'             => $user['nik'],
+            'username'        => $user['username'],
+            'nama'            => $user['nama'],
+            'id_unit'         => $user['id_unit'],
+            'nm_unit'         => $user['nm_unit'],
+            'id_jabatan'      => $user['id_jabatan'],
+            'nm_jabatan'      => $user['nm_jabatan'],
+            'wajah_terdaftar' => $wajahTerdaftar,
         ]);
     }
 
@@ -176,5 +185,162 @@ class AuthController
 
         // Kirim response sukses
         jsonSuccess('Password berhasil diubah');
+    }
+
+    // ---------------------------------------------------------------
+    // LUPA PASSWORD — via verifikasi wajah (TANPA email/OTP, karena
+    // tabel karyawan/login tidak punya kolom kontak sama sekali).
+    //
+    // Alur:
+    //   1. User masukkan NIK, lalu ambil foto wajah di app.
+    //   2. forgotPasswordVerify(): cocokkan embedding wajah itu dengan
+    //      wajah referensi milik NIK tsb (yang sama dipakai utk absen).
+    //      Kalau cocok -> balas "reset_token" (JWT umur pendek, 5 menit,
+    //      purpose khusus 'reset_password', TIDAK bisa dipakai sebagai
+    //      token login biasa).
+    //   3. forgotPasswordReset(): user set password baru, dikirim
+    //      bareng reset_token dari langkah 2.
+    //
+    // Endpoint ini SENGAJA tidak pakai requireAuth() — justru dipakai
+    // saat user TIDAK BISA login (lupa password).
+    // ---------------------------------------------------------------
+
+    // Langkah 1: cocokkan NIK + embedding wajah, keluarkan reset_token
+    public function forgotPasswordVerify(): void
+    {
+        $input = json_decode(file_get_contents('php://input'), true);
+
+        if (!is_array($input)) {
+            jsonError('Body request tidak valid (harus JSON)', 400);
+        }
+
+        $nik = trim((string) ($input['nik'] ?? ''));
+        $embedding = $input['embedding'] ?? null;
+
+        if ($nik === '') {
+            jsonError('NIK wajib diisi', 400);
+        }
+
+        $error = validasiEmbedding($embedding);
+        if ($error !== null) {
+            jsonError($error, 400);
+        }
+
+        $pdo = require __DIR__ . '/../config/database.php';
+
+        // Pastikan NIK terdaftar sebagai karyawan aktif & punya akun login
+        $stmt = $pdo->prepare(
+            'SELECT k.nik, k.status_aktif
+             FROM karyawan k
+             JOIN login l ON l.nik = k.nik
+             WHERE k.nik = ?'
+        );
+        $stmt->execute([$nik]);
+        $user = $stmt->fetch();
+
+        if ($user === false) {
+            jsonError('NIK tidak ditemukan', 404);
+        }
+
+        if ($user['status_aktif'] !== 'Aktif') {
+            jsonError('Akun tidak aktif. Silakan hubungi admin', 403);
+        }
+
+        // Ambil wajah referensi milik NIK ini
+        $wajahStmt = $pdo->prepare('SELECT embedding FROM wajah_referensi WHERE nik = ?');
+        $wajahStmt->execute([$nik]);
+        $wajahRow = $wajahStmt->fetch();
+
+        if ($wajahRow === false) {
+            jsonError(
+                'Wajah referensi belum terdaftar untuk NIK ini, sehingga '
+                    . 'reset password lewat wajah tidak dapat dilakukan. '
+                    . 'Silakan hubungi admin.',
+                404
+            );
+        }
+
+        $referensi = json_decode($wajahRow['embedding'], true);
+
+        if (!is_array($referensi) || count($referensi) !== FACE_EMBEDDING_LENGTH) {
+            jsonError('Data wajah referensi tidak valid, silakan hubungi admin', 500);
+        }
+
+        $score = cosineSimilarity($embedding, $referensi);
+        $match = $score >= FACE_MATCH_THRESHOLD;
+
+        if (!$match) {
+            jsonError(
+                'Wajah tidak cocok dengan data karyawan terdaftar. Reset '
+                    . 'password dibatalkan, silakan coba lagi.',
+                401
+            );
+        }
+
+        // Wajah cocok -> keluarkan reset_token umur pendek (bukan token
+        // login biasa — punya 'purpose' khusus supaya tidak bisa disalah-
+        // gunakan untuk memanggil endpoint lain yang butuh requireAuth()).
+        $resetToken = generateJWT(
+            ['nik' => $nik, 'purpose' => 'reset_password'],
+            RESET_PASSWORD_TOKEN_EXPIRY_SECONDS
+        );
+
+        jsonSuccess('Verifikasi wajah berhasil, silakan buat password baru', [
+            'reset_token' => $resetToken,
+            'score'       => round($score, 4),
+        ]);
+    }
+
+    // Langkah 2: set password baru pakai reset_token dari langkah 1
+    public function forgotPasswordReset(): void
+    {
+        $input = json_decode(file_get_contents('php://input'), true);
+
+        if (!is_array($input)) {
+            jsonError('Body request tidak valid (harus JSON)', 400);
+        }
+
+        $resetToken = trim((string) ($input['reset_token'] ?? ''));
+        $newPassword = (string) ($input['new_password'] ?? '');
+
+        if ($resetToken === '' || $newPassword === '') {
+            jsonError('Reset token dan password baru wajib diisi', 400);
+        }
+
+        if (strlen($newPassword) < 6) {
+            jsonError('Password baru minimal 6 karakter', 400);
+        }
+
+        $payload = verifyJWT($resetToken);
+
+        if ($payload === null) {
+            jsonError(
+                'Sesi reset password tidak valid atau sudah kadaluarsa. '
+                    . 'Silakan ulangi verifikasi wajah.',
+                401
+            );
+        }
+
+        if (($payload['purpose'] ?? null) !== 'reset_password') {
+            jsonError('Token tidak valid untuk reset password', 400);
+        }
+
+        $nik = $payload['nik'] ?? null;
+        if (!is_string($nik) || $nik === '') {
+            jsonError('Token tidak valid untuk reset password', 400);
+        }
+
+        $pdo = require __DIR__ . '/../config/database.php';
+
+        $newHash = password_hash($newPassword, PASSWORD_DEFAULT);
+
+        $updateStmt = $pdo->prepare('UPDATE login SET password = ? WHERE nik = ?');
+        $updateStmt->execute([$newHash, $nik]);
+
+        if ($updateStmt->rowCount() === 0) {
+            jsonError('User tidak ditemukan', 404);
+        }
+
+        jsonSuccess('Password berhasil direset. Silakan login dengan password baru Anda.');
     }
 }

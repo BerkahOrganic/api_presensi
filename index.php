@@ -97,6 +97,9 @@ $routes = [
     'GET /api/auth/me'               => [AuthController::class, 'me'], //Profil
     'PUT /api/auth/change-password'  => [AuthController::class, 'changePassword'], //Ganti Password
 
+    'POST /api/auth/forgot-password/verify' => [AuthController::class, 'forgotPasswordVerify'], //Lupa password: verifikasi wajah
+    'PUT /api/auth/forgot-password/reset'   => [AuthController::class, 'forgotPasswordReset'], //Lupa password: set password baru
+
     'POST /api/absensi/checkin'      => [AbsensiController::class, 'checkin'], //Absensi masuk
     'PUT /api/absensi/checkout'      => [AbsensiController::class, 'checkout'], //Absensi pulang
     'GET /api/absensi/today'         => [AbsensiController::class, 'today'], //Status harian

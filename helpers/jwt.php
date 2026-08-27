@@ -19,9 +19,12 @@ function base64UrlDecode(string $data): string
 
 /**
  * @param array $payload Data yang ingin disimpan di token,
+ * @param int|null $expirySeconds Umur token custom (detik). Kalau null,
+ *        pakai JWT_EXPIRY_SECONDS (default, untuk token login biasa).
+ *        Dipakai untuk token berumur pendek seperti reset password.
  * @return string Token JWT lengkap (header.payload.signature)
  */
-function generateJWT(array $payload): string
+function generateJWT(array $payload, ?int $expirySeconds = null): string
 {
     $header = [
         'typ' => 'JWT',
@@ -30,7 +33,7 @@ function generateJWT(array $payload): string
 
     $now = time();
     $payload['iat'] = $now;
-    $payload['exp'] = $now + JWT_EXPIRY_SECONDS;
+    $payload['exp'] = $now + ($expirySeconds ?? JWT_EXPIRY_SECONDS);
 
     $headerEncoded  = base64UrlEncode(json_encode($header));
     $payloadEncoded = base64UrlEncode(json_encode($payload));
