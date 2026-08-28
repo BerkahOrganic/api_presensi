@@ -13,25 +13,20 @@
  *
  * Semua endpoint di sini membutuhkan login (JWT).
  * NIK SELALU diambil dari payload token requireAuth(), bukan dari body.
+ *
+ * Validasi embedding & perhitungan cosine similarity dipakai bersama
+ * dengan alur "Lupa Password via Wajah" di AuthController, jadi
+ * logic-nya ditaruh satu tempat di helpers/face.php.
  */
 
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers/response.php';
+require_once __DIR__ . '/../helpers/face.php';
 require_once __DIR__ . '/../middleware/auth.php';
 
 class WajahController
 {
-    // Jumlah angka yang harus ada di setiap embedding MobileFaceNet.
-    // Kalau nanti ganti model dengan output dimensi lain, ubah nilai ini.
-    private const EMBEDDING_LENGTH = 192;
-
-    // Ambang batas cosine similarity untuk dianggap "cocok".
-    // 1.0 = identik sempurna, 0.0 = tidak mirip sama sekali.
-    // Nilai 0.6 adalah titik awal yang wajar untuk MobileFaceNet —
-    // sesuaikan lagi (naik/turun) setelah beberapa kali testing nyata.
-    private const MATCH_THRESHOLD = 0.6;
-
     // Daftarkan / perbarui wajah referensi milik user yang login
     public function enroll(): void
     {
@@ -47,7 +42,7 @@ class WajahController
 
         $embedding = $input['embedding'] ?? null;
 
-        $error = $this->validasiEmbedding($embedding);
+        $error = validasiEmbedding($embedding);
         if ($error !== null) {
             jsonError($error, 400);
         }
@@ -86,7 +81,7 @@ class WajahController
 
         $embedding = $input['embedding'] ?? null;
 
-        $error = $this->validasiEmbedding($embedding);
+        $error = validasiEmbedding($embedding);
         if ($error !== null) {
             jsonError($error, 400);
         }
@@ -109,14 +104,14 @@ class WajahController
 
         $referensi = json_decode($row['embedding'], true);
 
-        if (!is_array($referensi) || count($referensi) !== self::EMBEDDING_LENGTH) {
+        if (!is_array($referensi) || count($referensi) !== FACE_EMBEDDING_LENGTH) {
             // Data referensi di database korup/rusak — kasus langka tapi
             // penting ditangani supaya tidak fatal error ke user.
             jsonError('Data wajah referensi tidak valid, silakan daftar ulang', 500);
         }
 
-        $score = $this->cosineSimilarity($embedding, $referensi);
-        $match = $score >= self::MATCH_THRESHOLD;
+        $score = cosineSimilarity($embedding, $referensi);
+        $match = $score >= FACE_MATCH_THRESHOLD;
 
         // Kirim response sukses — perhatikan: "tidak cocok" BUKAN error
         // HTTP, tetap success:true supaya Flutter bisa baca field "match"
@@ -125,48 +120,5 @@ class WajahController
             'match' => $match,
             'score' => round($score, 4),
         ]);
-    }
-
-    // Validasi bentuk embedding: harus array angka sepanjang EMBEDDING_LENGTH
-    private function validasiEmbedding($embedding): ?string
-    {
-        if (!is_array($embedding)) {
-            return 'Field embedding wajib berupa array angka';
-        }
-
-        if (count($embedding) !== self::EMBEDDING_LENGTH) {
-            return 'Panjang embedding tidak valid (harus '
-                . self::EMBEDDING_LENGTH . ' angka)';
-        }
-
-        foreach ($embedding as $nilai) {
-            if (!is_int($nilai) && !is_float($nilai)) {
-                return 'Semua elemen embedding harus berupa angka';
-            }
-        }
-
-        return null; // valid
-    }
-
-    // Hitung cosine similarity antara 2 vector embedding.
-    // Hasil mendekati 1.0 = sangat mirip, mendekati 0.0 = tidak mirip.
-    private function cosineSimilarity(array $a, array $b): float
-    {
-        $dotProduct = 0.0;
-        $normA = 0.0;
-        $normB = 0.0;
-
-        $panjang = count($a);
-        for ($i = 0; $i < $panjang; $i++) {
-            $dotProduct += $a[$i] * $b[$i];
-            $normA += $a[$i] ** 2;
-            $normB += $b[$i] ** 2;
-        }
-
-        if ($normA <= 0.0 || $normB <= 0.0) {
-            return 0.0; // hindari pembagian dengan nol
-        }
-
-        return $dotProduct / (sqrt($normA) * sqrt($normB));
     }
 }
