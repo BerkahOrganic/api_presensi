@@ -149,16 +149,14 @@ class AbsensiController
             mkdir($uploadDir, 0755, true);
         }
 
-        $filename = $nik . '_' . date('YmdHis') . '.' . $extension;
+        $namaAcak = bin2hex(random_bytes(16));
+        $filename = $namaAcak . '.' . $extension;
         $fullPath = $uploadDir . $filename;
 
         if (file_put_contents($fullPath, $decoded) === false) {
             return null;
         }
 
-        // Simpan PATH RELATIF di database (bukan path absolute server),
-        // supaya gampang dipakai bikin URL lengkap nanti di dashboard admin
-        // (tinggal digabung: baseUrl + '/' + foto_bukti).
         return 'uploads/absensi/' . $filename;
     }
 

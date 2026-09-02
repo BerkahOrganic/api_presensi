@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/vendor/autoload.php';
+
 const DB_HOST = 'localhost';
-const DB_NAME = 'db_bekah_presensi';
-const DB_USER = 'root';
-const DB_PASS = '$Berkah_App#26#';
+const DB_NAME = $_ENV['DB_NAME'] ?? '';
+const DB_USER = $_ENV['DB_USN'] ?? '';
+const DB_PASS = $_ENV['DB_PASS'] ?? '';
 const DB_CHARSET = 'utf8mb4';
 
 $dsn = 'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=' . DB_CHARSET;
