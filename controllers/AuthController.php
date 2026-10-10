@@ -391,4 +391,41 @@ class AuthController
 
         jsonSuccess('Akun berhasil dibuat. Silakan login dengan username dan password Anda.', null, 201);
     }
+
+    public function checkNik(): void
+    {
+        $input = json_decode(file_get_contents('php://input'), true);
+    
+        if (!is_array($input)) {
+            jsonError('Body request tidak valid (harus JSON)', 400);
+        }
+    
+        $nik = trim((string) ($input['nik'] ?? ''));
+    
+        if ($nik === '') {
+            jsonError('NIK wajib diisi', 400);
+        }
+    
+        $pdo = require __DIR__ . '/../config/database.php';
+    
+        $stmt = $pdo->prepare('SELECT nik, nama, status_aktif FROM karyawan WHERE nik = ?');
+        $stmt->execute([$nik]);
+        $karyawan = $stmt->fetch();
+    
+        if ($karyawan === false) {
+            jsonError('NIK tidak ditemukan di tabel karyawan, hubungi admin/HR', 404);
+        }
+    
+        if ($karyawan['status_aktif'] !== 'Aktif') {
+            jsonError('Akun tidak aktif. Silakan hubungi admin', 403);
+        }
+    
+        $stmt = $pdo->prepare('SELECT id_user FROM login WHERE nik = ?');
+        $stmt->execute([$nik]);
+        if ($stmt->fetch() !== false) {
+            jsonError('NIK ini sudah memiliki akun, silakan langsung login', 409);
+        }
+    
+        jsonSuccess('NIK ditemukan', ['nama' => $karyawan['nama']], 200);
+    }
 }
